@@ -1,0 +1,181 @@
+/* Cofradía – Mitglieder (Handy-App). Daten bleiben im Handy; Abgleich mit dem Notebook über eine JSON-Datei (Google Drive). */
+'use strict';
+const ES = {
+  'Mitglieder': 'Socios', 'Beiträge': 'Cuotas', 'Abgleich': 'Sincronizar', 'Suchen': 'Buscar', 'Jahr': 'Año', 'Alle aktiven': 'Todos los activos', 'Noch nicht bezahlt': 'Sin pagar', 'Bezahlt': 'Pagado', 'Ausgetretene mit': 'Incluir bajas',
+  'Neues Mitglied': 'Nuevo socio', 'Vorname (Nombre)': 'Nombre', 'Apellido 1 (Nachname 1)': 'Primer apellido', 'Apellido 2 (Nachname 2)': 'Segundo apellido', 'Apodo (Beiname)': 'Apodo', 'Notiz': 'Nota', 'Geburtstag': 'Cumpleaños', 'Mobiltelefon': 'Móvil', 'E-Mail': 'Correo electrónico', 'Adresse': 'Dirección',
+  'Eintrittsjahr': 'Año de ingreso', 'Aktives Mitglied': 'Socio activo', 'Speichern': 'Guardar', 'Abbrechen': 'Cancelar', 'Gespeichert.': 'Guardado.', 'Vorname und erster Nachname fehlen.': 'Faltan el nombre y el primer apellido.',
+  'Die Nummer vergibt das Notebook beim Abgleich.': 'El número lo asigna el portátil al sincronizar.', 'Nummer': 'Número', 'ausgetreten ab': 'baja desde', 'Zahlungen': 'Pagos', 'noch offen': 'pendiente', 'bezahlt am': 'pagado el', 'Quittung': 'Recibo', 'bezahlt durch': 'pagado por', 'hat mitbezahlt für': 'ha pagado también por', 'zahlt auch für': 'paga también por',
+  'Beitrag €': 'Cuota €', 'heute': 'hoy', 'bezahlt durch …': 'pagado por …', 'Bemerkung': 'Observación', 'Bitte ein Mitglied aus der Liste auswählen.': 'Seleccione un socio de la lista.',
+  'Nachname 1, Nachname 2, Vorname': 'Apellido 1, apellido 2, nombre', 'Vorname, Nachname 1, Nachname 2': 'Nombre, apellido 1, apellido 2',
+  'Sichern (nach Google Drive)': 'Guardar (en Google Drive)', 'Laden (vom Google Drive)': 'Cargar (desde Google Drive)', 'Keine Daten im Handy. Bitte zuerst die Datei „cofradia-daten.json“ aus dem Google Drive laden.': 'No hay datos en el móvil. Cargue primero el archivo «cofradia-daten.json» desde Google Drive.',
+  'Das ist keine Datei der Mitgliederverwaltung.': 'Este archivo no es de la administración de socios.', 'Die Datei konnte nicht gelesen werden.': 'No se pudo leer el archivo.', 'Stand im Handy:': 'Datos en el móvil:', 'noch nie abgeglichen': 'nunca sincronizado', 'Zuletzt gesichert:': 'Última copia:', 'nie': 'nunca',
+  'Sichern erzeugt eine Datei. Wähle in der Liste „Drive“ aus; das Notebook liest sie beim nächsten Abgleich ein.': 'Al guardar se crea un archivo. Elija «Drive» en la lista; el portátil lo leerá en la próxima sincronización.',
+  'Laden öffnet die Dateiauswahl: nimm die Datei „cofradia-daten.json“ aus dem Drive-Ordner „Cofradia-Verwaltung“.': 'Al cargar se abre el selector de archivos: elija «cofradia-daten.json» de la carpeta «Cofradia-Verwaltung» de Drive.',
+  'Datei gesichert.': 'Archivo guardado.', 'Es sind keine Mitglieder in dieser Liste.': 'No hay socios en esta lista.', 'Keine Treffer.': 'Sin resultados.', 'Wählen': 'Elegir',
+  'Mitglieder insgesamt': 'socios en total', 'aktiv': 'activos', 'haben bezahlt': 'han pagado', 'offen': 'pendientes', 'Eingenommen': 'Ingresado', 'von': 'de'
+};
+let LANG = 'de'; try { LANG = localStorage.getItem('cd_lang') === 'es' ? 'es' : 'de'; } catch (e) { }
+const t = s => LANG === 'es' && ES[s] ? ES[s] : s;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const eur = v => Number(v).toLocaleString(LANG === 'es' ? 'es-ES' : 'de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+const heute = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const uid = () => [...crypto.getRandomValues(new Uint8Array(8))].map(b => b.toString(16).padStart(2, '0')).join('');
+function msg(s, err) { const e = $('#toast'); e.textContent = s; e.className = err ? 'err' : ''; e.style.display = 'block'; clearTimeout(msg.t); msg.t = setTimeout(() => e.style.display = 'none', err ? 6000 : 2500); }
+
+/* ---------- Daten ---------- */
+const leer = () => ({ format: 'codinaysas', version: 1, von: 'handy', stand: 0, einstellungen: { beitrag: 15, kopf: 'Cofradia del Divino Nazareno y Santo Sepulcro', unterzeichner: 'F.Castro', jahr: 2026 }, mitglieder: [], beitraege: [], geloescht: [] });
+let D = (() => { try { const j = JSON.parse(localStorage.getItem('cd_data')); if (j && Array.isArray(j.mitglieder)) return j; } catch (e) { } return leer(); })();
+function save() { try { localStorage.setItem('cd_data', JSON.stringify(D)); } catch (e) { msg('Speichern im Handy nicht möglich.', 1); } }
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { }
+const S = { tab: 'm', jahr: +D.einstellungen.jahr || 2026, q: '', filt: 'aktiv', bfilt: 'alle', ord: (() => { try { return localStorage.getItem('cd_ord') === 'v' ? 'v' : 'n'; } catch (e) { return 'n'; } })() };
+const MF = ['nummer', 'nombre', 'apellido1', 'apellido2', 'apodo', 'notiz', 'aktiv', 'eintritt', 'austritt', 'geburtstag', 'email', 'mobil', 'adresse'];
+const pickM = m => { const o = { uid: m.uid }; MF.forEach(k => o[k] = ['aktiv', 'eintritt', 'austritt'].includes(k) ? (+m[k] || 0) : String(m[k] ?? '').trim()); return o; };
+const imJahr = (m, y) => m.eintritt <= y && (!m.austritt || m.austritt > y);
+const nm = m => [m.nombre, m.apellido1, m.apellido2].filter(Boolean).join(' ');
+const voll = m => S.ord === 'v' ? nm(m) : ([m.apellido1, m.apellido2].filter(Boolean).join(' ') + (m.nombre && (m.apellido1 || m.apellido2) ? ', ' : '') + (m.nombre || ''));
+const coll = new Intl.Collator('es', { sensitivity: 'base' });
+const sortM = a => a.sort((x, y) => S.ord === 'v' ? (coll.compare(x.nombre, y.nombre) || coll.compare(x.apellido1, y.apellido1) || coll.compare(x.apellido2, y.apellido2)) : (coll.compare(x.apellido1, y.apellido1) || coll.compare(x.apellido2, y.apellido2) || coll.compare(x.nombre, y.nombre)));
+const getB = (u, y) => D.beitraege.find(b => b.uid === u && b.jahr === y);
+function ensB(u, y) { let b = getB(u, y); if (!b) { b = { uid: u, jahr: y, betrag: +D.einstellungen.beitrag || 15, bezahlt: '', quittung_nr: 0, zahler: '', bemerkung: '', geaendert: Date.now() }; D.beitraege.push(b); } return b; }
+const mByUid = u => D.mitglieder.find(m => m.uid === u);
+
+/* ---------- Abgleich (gleiche Regeln wie am Notebook) ---------- */
+function merge(r) {
+  if (!r || r.format !== 'codinaysas') throw new Error(t('Das ist keine Datei der Mitgliederverwaltung.'));
+  const z = { neu: 0, geaendert: 0, beitraege: 0, geloescht: 0 };
+  const tomb = new Map(D.geloescht.map(x => [x.uid, x.geaendert])), loc = new Map(D.mitglieder.map(x => [x.uid, x]));
+  for (const m of r.mitglieder || []) {
+    const g = +m.geaendert || 0; if (!m.uid || !String(m.nombre || '').trim()) continue;
+    if (tomb.has(m.uid) && tomb.get(m.uid) >= g) continue;
+    const l = loc.get(m.uid), n = pickM(m);
+    if (!l) { const o = { ...n, geaendert: g }; D.mitglieder.push(o); loc.set(o.uid, o); z.neu++; }
+    else if (g > l.geaendert) { if (!n.nummer) n.nummer = l.nummer; Object.assign(l, n, { geaendert: g }); z.geaendert++; }
+  }
+  for (const x of r.geloescht || []) {
+    const i = D.mitglieder.findIndex(m => m.uid === x.uid);
+    if (i >= 0 && D.mitglieder[i].geaendert < x.geaendert) { D.mitglieder.splice(i, 1); z.geloescht++; }
+    if (!D.geloescht.some(y => y.uid === x.uid)) D.geloescht.push({ uid: x.uid, geaendert: x.geaendert });
+  }
+  const have = new Set(D.mitglieder.map(m => m.uid));
+  for (const b of r.beitraege || []) {
+    if (!have.has(b.uid)) continue; const g = +b.geaendert || 0, l = getB(b.uid, +b.jahr);
+    const n = { uid: b.uid, jahr: +b.jahr, betrag: +b.betrag || 0, bezahlt: String(b.bezahlt || ''), quittung_nr: +b.quittung_nr || 0, zahler: have.has(b.zahler) ? b.zahler : '', bemerkung: String(b.bemerkung || ''), geaendert: g };
+    if (!l) { D.beitraege.push(n); z.beitraege++; }
+    else if (g > l.geaendert) { n.quittung_nr = Math.max(n.quittung_nr, l.quittung_nr); Object.assign(l, n); z.beitraege++; }
+    else if (n.quittung_nr > l.quittung_nr) l.quittung_nr = n.quittung_nr;
+  }
+  if (r.einstellungen && r.von === 'notebook') { D.einstellungen = { ...D.einstellungen, ...r.einstellungen }; if (!D.geladen) S.jahr = +D.einstellungen.jahr || S.jahr; }
+  if (r.von === 'notebook') D.geladen = Date.now();
+  save(); return z;
+}
+async function laden(inp) {
+  const f = inp.files[0]; inp.value = ''; if (!f) return;
+  try { const j = JSON.parse(await f.text()); const z = merge(j); msg(`${z.neu} ${t('Mitglieder')} +, ${z.geaendert} ✎, ${z.beitraege} ${t('Beiträge')}`); go(S.tab); }
+  catch (e) { msg(e instanceof SyntaxError ? t('Die Datei konnte nicht gelesen werden.') : e.message, 1); }
+}
+async function sichern() {
+  const d = new Date(), p = n => String(n).padStart(2, '0'), fn = `cofradia-handy-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.json`;
+  const out = { ...D, von: 'handy', stand: Date.now() }; delete out.geladen; delete out.gesichert;
+  const file = new File([JSON.stringify(out)], fn, { type: 'application/json' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: fn });
+    else { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = fn; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); }
+    D.gesichert = Date.now(); save(); msg(t('Datei gesichert.')); go(S.tab);
+  } catch (e) { if (e && e.name !== 'AbortError') msg(String(e.message || e), 1); }
+}
+
+/* ---------- Oberfläche ---------- */
+const TABS = [['m', 'Mitglieder'], ['b', 'Beiträge'], ['y', 'Abgleich']];
+function chrome() {
+  $('#nv').innerHTML = TABS.map(([k, n]) => `<button class="${S.tab === k ? 'on' : ''}" onclick="go('${k}')">${t(n)}</button>`).join('');
+  $('#lg').innerHTML = `<button class="${LANG === 'de' ? 'on' : ''}" onclick="lang('de')">DE</button> <button class="${LANG === 'es' ? 'on' : ''}" onclick="lang('es')">ES</button>`;
+  $('#hs').textContent = D.mitglieder.length + ' ' + t('Mitglieder insgesamt');
+}
+function lang(l) { LANG = l; try { localStorage.setItem('cd_lang', l); } catch (e) { } document.documentElement.lang = l; go(S.tab); }
+function go(tab) { S.tab = tab; chrome(); ({ m: vM, b: vB, y: vY })[tab](); scrollTo(0, 0); }
+const yrOpts = () => { let h = ''; for (let y = 2022; y <= 2032; y++) h += `<option ${y === S.jahr ? 'selected' : ''}>${y}</option>`; return h; };
+const ordSel = () => `<select onchange="S.ord=this.value;try{localStorage.setItem('cd_ord',S.ord)}catch(e){}go(S.tab)"><option value="n" ${S.ord === 'n' ? 'selected' : ''}>${t('Nachname 1, Nachname 2, Vorname')}</option><option value="v" ${S.ord === 'v' ? 'selected' : ''}>${t('Vorname, Nachname 1, Nachname 2')}</option></select>`;
+const keepQ = () => `<input type="search" id="q" placeholder="${t('Suchen')}" value="${esc(S.q)}" oninput="S.q=this.value;list()">`;
+
+function vM() {
+  if (!D.mitglieder.length) { $('#m').innerHTML = `<div class="sum">${t('Keine Daten im Handy. Bitte zuerst die Datei „cofradia-daten.json“ aus dem Google Drive laden.')}</div><div class="row"><button class="btn" onclick="go('y')">${t('Abgleich')}</button></div>`; return; }
+  $('#m').innerHTML = `<div class="half"><select onchange="S.jahr=+this.value;list()">${yrOpts()}</select><button class="btn" onclick="edit('')">+ ${t('Neues Mitglied')}</button></div>
+   <div class="row">${ordSel()}</div><div class="row">${keepQ()}</div><div id="ls"></div>`;
+  list();
+}
+function list() {
+  const q = S.q.toLowerCase(); let rows = D.mitglieder.filter(m => m.eintritt <= S.jahr && imJahr(m, S.jahr) && (!q || (nm(m) + ' ' + m.apodo + ' ' + m.nummer).toLowerCase().includes(q)));
+  const n = rows.length; sortM(rows);
+  $('#ls').innerHTML = `<div class="mu">${n} ${t('aktiv')}</div>` + (rows.length ? rows.map(m => `<div class="card" onclick="edit('${m.uid}')"><b>${esc(voll(m))}</b>${m.apodo ? ` <span class="tag">${esc(m.apodo)}</span>` : ''}<div class="mu">${esc(m.nummer || '–')}</div></div>`).join('') : `<div class="mu">${t('Keine Treffer.')}</div>`);
+}
+function fld(id, label, val, type) { return `<label>${t(label)}</label><input id="f_${id}" type="${type || 'text'}" value="${esc(val)}">`; }
+function edit(u) {
+  const m = u ? mByUid(u) : { nombre: '', apellido1: '', apellido2: '', apodo: '', nummer: '', notiz: '', geburtstag: '', email: '', mobil: '', adresse: '', eintritt: S.jahr, austritt: 0, aktiv: 1 };
+  const pays = u ? D.beitraege.filter(b => b.uid === u && (b.bezahlt || b.quittung_nr || b.zahler || b.bemerkung)).sort((a, b) => a.jahr - b.jahr) : [];
+  const fuer = u ? D.beitraege.filter(b => b.zahler === u).sort((a, b) => a.jahr - b.jahr) : [];
+  $('#ov').innerHTML = `<div class="sheet"><h2 style="margin-top:0">${u ? esc(nm(m)) : t('Neues Mitglied')}</h2>
+   <div class="mu">${t('Nummer')}: ${esc(m.nummer || '–')}${m.nummer ? '' : ' – ' + t('Die Nummer vergibt das Notebook beim Abgleich.')}</div>
+   ${fld('nombre', 'Vorname (Nombre)', m.nombre)}${fld('apellido1', 'Apellido 1 (Nachname 1)', m.apellido1)}${fld('apellido2', 'Apellido 2 (Nachname 2)', m.apellido2)}${fld('apodo', 'Apodo (Beiname)', m.apodo)}
+   ${fld('mobil', 'Mobiltelefon', m.mobil, 'tel')}${fld('email', 'E-Mail', m.email, 'email')}${fld('geburtstag', 'Geburtstag', m.geburtstag, 'date')}
+   <label>${t('Adresse')}</label><textarea id="f_adresse">${esc(m.adresse)}</textarea><label>${t('Notiz')}</label><textarea id="f_notiz">${esc(m.notiz)}</textarea>
+   ${fld('eintritt', 'Eintrittsjahr', m.eintritt, 'number')}
+   <label class="chk"><input type="checkbox" id="f_aktiv" ${m.aktiv && !m.austritt ? 'checked' : ''}> ${t('Aktives Mitglied')}${m.austritt ? ' (' + t('ausgetreten ab') + ' ' + m.austritt + ')' : ''}</label>
+   <div class="row"><button class="btn" onclick="eSave('${u}')">${t('Speichern')}</button><button class="btn alt" onclick="eClose()">${t('Abbrechen')}</button></div>
+   ${pays.length || fuer.length ? `<h3>${t('Zahlungen')}</h3><div class="mu">${pays.map(b => { const z = b.zahler && mByUid(b.zahler); return `${b.jahr}: ${eur(b.betrag)}, ${b.bezahlt ? t('bezahlt am') + ' ' + esc(b.bezahlt) : t('noch offen')}${b.quittung_nr ? ', ' + t('Quittung') + ' ' + b.quittung_nr : ''}${z ? ', ' + t('bezahlt durch') + ' ' + esc(nm(z)) : ''}${b.bemerkung ? ' – ' + esc(b.bemerkung) : ''}`; }).concat(fuer.map(b => { const z = mByUid(b.uid); return `${b.jahr}: ${t('hat mitbezahlt für')} ${z ? esc(nm(z)) : ''}`; })).join('<br>')}</div>` : ''}</div>`;
+  $('#ov').style.display = 'block'; document.body.style.overflow = 'hidden';
+}
+function eClose() { $('#ov').style.display = 'none'; document.body.style.overflow = ''; }
+function eSave(u) {
+  const v = {}; ['nombre', 'apellido1', 'apellido2', 'apodo', 'mobil', 'email', 'geburtstag', 'adresse', 'notiz'].forEach(k => v[k] = $('#f_' + k).value.trim());
+  if (!v.nombre || !v.apellido1) return msg(t('Vorname und erster Nachname fehlen.'), 1);
+  const ein = +$('#f_eintritt').value || S.jahr, akt = $('#f_aktiv').checked;
+  let m = u ? mByUid(u) : null; if (!m) { m = { uid: uid(), nummer: '', aktiv: 1, austritt: 0 }; D.mitglieder.push(m); }
+  Object.assign(m, v, { eintritt: ein, geaendert: Date.now() });
+  if (akt) { m.austritt = 0; m.aktiv = 1; } else if (!m.austritt) { m.austritt = S.jahr; m.aktiv = 0; }
+  save(); eClose(); msg(t('Gespeichert.')); go(S.tab);
+}
+
+const bLabel = m => voll(m) + ' · ' + (m.nummer || '–');
+function vB() {
+  if (!D.mitglieder.length) return vM();
+  $('#m').innerHTML = `<div class="half"><select onchange="S.jahr=+this.value;bl()">${yrOpts()}</select><select onchange="S.bfilt=this.value;bl()"><option value="alle" ${S.bfilt === 'alle' ? 'selected' : ''}>${t('Alle aktiven')}</option><option value="offen" ${S.bfilt === 'offen' ? 'selected' : ''}>${t('Noch nicht bezahlt')}</option><option value="bez" ${S.bfilt === 'bez' ? 'selected' : ''}>${t('Bezahlt')}</option></select></div>
+   <div class="row">${ordSel()}</div><div class="row">${keepQ().replace('list()', 'bl()')}</div><div id="sm" class="sum"></div><div id="ls"></div>
+   <datalist id="dl">${sortM(D.mitglieder.filter(m => m.eintritt <= S.jahr)).map(m => `<option value="${esc(bLabel(m))}">`).join('')}</datalist>`;
+  bl();
+}
+function bl() {
+  const y = S.jahr, act = D.mitglieder.filter(m => m.eintritt <= y && imJahr(m, y)), q = S.q.toLowerCase();
+  const paid = act.filter(m => { const b = getB(m.uid, y); return b && b.bezahlt; });
+  $('#sm').innerHTML = `<b>${y}:</b> ${paid.length} ${t('von')} ${act.length} ${t('haben bezahlt')}, ${act.length - paid.length} ${t('offen')}. ${t('Eingenommen')}: <b>${eur(paid.reduce((a, m) => a + (+getB(m.uid, y).betrag || 0), 0))}</b>`;
+  let rows = act.filter(m => { const b = getB(m.uid, y), p = !!(b && b.bezahlt); return (S.bfilt === 'alle' || (S.bfilt === 'offen' ? !p : p)) && (!q || (nm(m) + ' ' + m.apodo + ' ' + m.nummer).toLowerCase().includes(q)); });
+  sortM(rows);
+  $('#ls').innerHTML = rows.map(m => {
+    const b = getB(m.uid, y) || {}, z = b.zahler ? mByUid(b.zahler) : null, fuer = D.beitraege.filter(x => x.jahr === y && x.zahler === m.uid).map(x => mByUid(x.uid)).filter(Boolean);
+    return `<div class="card"><b>${esc(voll(m))}</b>${m.apodo ? ` <span class="tag">${esc(m.apodo)}</span>` : ''}<div class="mu">${esc(m.nummer || '–')}${b.quittung_nr ? ' · ' + t('Quittung') + ' ' + b.quittung_nr : ''}</div>
+     <div class="half"><div><label>${t('Beitrag €')}</label><input type="number" step="0.01" inputmode="decimal" value="${b.betrag ?? D.einstellungen.beitrag}" onchange="bSet('${m.uid}','betrag',this.value)"></div>
+     <div><label>${t('bezahlt am')}</label><input type="date" id="d${m.uid}" value="${b.bezahlt || ''}" onchange="bSet('${m.uid}','bezahlt',this.value)"></div></div>
+     <div class="row"><button class="btn s alt" onclick="bHeute('${m.uid}')">${t('heute')}</button></div>
+     <input list="dl" value="${esc(z ? bLabel(z) : '')}" placeholder="${t('bezahlt durch …')}" onchange="bZahler('${m.uid}',this)" style="margin-top:6px">
+     <input type="text" value="${esc(b.bemerkung || '')}" placeholder="${t('Bemerkung')}" onchange="bSet('${m.uid}','bemerkung',this.value)" style="margin-top:6px">
+     ${fuer.map(f => `<div class="mu">${t('zahlt auch für')} ${esc(nm(f))}</div>`).join('')}</div>`;
+  }).join('') || `<div class="mu">${t('Keine Treffer.')}</div>`;
+}
+function bSet(u, k, v) {
+  const b = ensB(u, S.jahr); b[k] = k === 'betrag' ? (Math.round(parseFloat(String(v).replace(',', '.')) * 100) / 100 || 0) : String(v).trim(); b.geaendert = Date.now(); save();
+  if (k === 'bezahlt' || k === 'betrag') { const sc = scrollY; bl(); scrollTo(0, sc); }
+}
+function bHeute(u) { bSet(u, 'bezahlt', heute()); }
+function bZahler(u, inp) {
+  const v = inp.value.trim(); let z = '';
+  if (v) { const m = D.mitglieder.find(x => bLabel(x) === v); if (!m) { msg(t('Bitte ein Mitglied aus der Liste auswählen.'), 1); inp.value = ''; return; } z = m.uid === u ? '' : m.uid; }
+  const b = ensB(u, S.jahr); b.zahler = z; b.geaendert = Date.now(); save(); const sc = scrollY; bl(); scrollTo(0, sc);
+}
+
+function vY() {
+  const f = ts => ts ? new Date(ts).toLocaleString(LANG === 'es' ? 'es-ES' : 'de-DE', { dateStyle: 'short', timeStyle: 'short' }) : t('nie');
+  $('#m').innerHTML = `<div class="sum">${t('Stand im Handy:')} ${D.mitglieder.length} ${t('Mitglieder')} · ${t('Zuletzt gesichert:')} ${f(D.gesichert)}${D.geladen ? '' : ' · ' + t('noch nie abgeglichen')}</div>
+   <div class="row"><button class="btn" onclick="sichern()">${t('Sichern (nach Google Drive)')}</button></div><p class="mu">${t('Sichern erzeugt eine Datei. Wähle in der Liste „Drive“ aus; das Notebook liest sie beim nächsten Abgleich ein.')}</p>
+   <div class="row"><label class="btn alt" style="display:inline-block;margin:0">${t('Laden (vom Google Drive)')}<input type="file" accept=".json,application/json" style="display:none" onchange="laden(this)"></label></div><p class="mu">${t('Laden öffnet die Dateiauswahl: nimm die Datei „cofradia-daten.json“ aus dem Drive-Ordner „Cofradia-Verwaltung“.')}</p>`;
+}
+go('m');
