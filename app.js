@@ -176,6 +176,6 @@ function vY() {
   const f = ts => ts ? new Date(ts).toLocaleString(LANG === 'es' ? 'es-ES' : 'de-DE', { dateStyle: 'short', timeStyle: 'short' }) : t('nie');
   $('#m').innerHTML = `<div class="sum">${t('Stand im Handy:')} ${D.mitglieder.length} ${t('Mitglieder')} · ${t('Zuletzt gesichert:')} ${f(D.gesichert)}${D.geladen ? '' : ' · ' + t('noch nie abgeglichen')}</div>
    <div class="row"><button class="btn" onclick="sichern()">${t('Sichern (nach Google Drive)')}</button></div><p class="mu">${t('Sichern erzeugt eine Datei. Wähle in der Liste „Drive“ aus; das Notebook liest sie beim nächsten Abgleich ein.')}</p>
-   <div class="row"><label class="btn alt" style="display:inline-block;margin:0">${t('Laden (vom Google Drive)')}<input type="file" accept=".json,application/json" style="display:none" onchange="laden(this)"></label></div><p class="mu">${t('Laden öffnet die Dateiauswahl: nimm die Datei „cofradia-daten.json“ aus dem Drive-Ordner „Cofradia-Verwaltung“.')}</p>`;
+   <div class="row"><label class="btn alt" style="display:inline-block;margin:0">${t('Laden (vom Google Drive)')}<input type="file" style="display:none" onchange="laden(this)"></label></div><p class="mu">${t('Laden öffnet die Dateiauswahl: nimm die Datei „cofradia-daten.json“ aus dem Drive-Ordner „Cofradia-Verwaltung“.')}</p>`;
 }
 go('m');
