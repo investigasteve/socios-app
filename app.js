@@ -77,9 +77,9 @@ async function laden(inp) {
   catch (e) { msg(e instanceof SyntaxError ? t('Die Datei konnte nicht gelesen werden.') : e.message, 1); }
 }
 async function sichern() {
-  const d = new Date(), p = n => String(n).padStart(2, '0'), fn = `cofradia-handy-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.json`;
+  const d = new Date(), p = n => String(n).padStart(2, '0'), fn = `cofradia-handy-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.txt`;
   const out = { ...D, von: 'handy', stand: Date.now() }; delete out.geladen; delete out.gesichert;
-  const file = new File([JSON.stringify(out)], fn, { type: 'application/json' });
+  const file = new File([JSON.stringify(out)], fn, { type: 'text/plain' });
   try {
     if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], title: fn });
     else { const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = fn; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); }
@@ -163,7 +163,7 @@ const TABS = [['m', 'Mitglieder'], ['b', 'Beiträge'], ['q', 'Scannen'], ['y', '
 function chrome() {
   $('#nv').innerHTML = TABS.map(([k, n]) => `<button class="${S.tab === k ? 'on' : ''}" onclick="go('${k}')">${t(n)}</button>`).join('');
   $('#lg').innerHTML = `<button class="${LANG === 'de' ? 'on' : ''}" onclick="sprache('de')">DE</button> <button class="${LANG === 'es' ? 'on' : ''}" onclick="sprache('es')">ES</button>`;
-  $('#hs').textContent = D.mitglieder.length + ' ' + t('Mitglieder insgesamt') + ' · v8';
+  $('#hs').textContent = D.mitglieder.length + ' ' + t('Mitglieder insgesamt') + ' · v9';
 }
 function sprache(l) { LANG = l; try { localStorage.setItem('cd_lang', l); } catch (e) { } document.documentElement.lang = l; go(S.tab); }
 function go(tab) { stopCam(); S.tab = tab; chrome(); ({ m: vM, b: vB, q: vQ, y: vY })[tab](); scrollTo(0, 0); }
