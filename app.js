@@ -1,7 +1,7 @@
 /* Cofradía – Mitglieder (Handy-App). Daten bleiben im Handy; Abgleich mit dem Notebook über eine JSON-Datei (Google Drive). */
 'use strict';
 const ES = {
-  'Scannen': 'Escanear', 'Halte die Kamera auf den kleinen Code unten links auf dem Beleg.': 'Apunte la cámara al pequeño código abajo a la izquierda del recibo.', 'Oder Belegnummer eintippen': 'O escriba el número del recibo', 'Die Kamera ist nicht verfügbar. Bitte die Nummer eintippen.': 'La cámara no está disponible. Escriba el número.',
+  'Scannen': 'Escanear', 'Der Code ist klein: Kamera ca. 10–15 cm vor den Code halten, ruhig und gut beleuchtet.': 'El código es pequeño: sostenga la cámara a unos 10–15 cm del código, quieta y con buena luz.', 'Halte die Kamera auf den kleinen Code unten links auf dem Beleg.': 'Apunte la cámara al pequeño código abajo a la izquierda del recibo.', 'Oder Belegnummer eintippen': 'O escriba el número del recibo', 'Die Kamera ist nicht verfügbar. Bitte die Nummer eintippen.': 'La cámara no está disponible. Escriba el número.',
   'Dieser Beleg ist im Handy nicht bekannt. Bitte im Reiter „Abgleich“ zuerst den neuesten Stand laden.': 'Este recibo no está en el móvil. Cargue primero los datos más recientes en «Sincronizar».', 'Beleg Nr.': 'Recibo n.º', 'Bereits bezahlt am': 'Ya pagado el', 'Als bezahlt eintragen': 'Registrar como pagado', 'Weiter scannen': 'Seguir escaneando', 'Gescannt am': 'Escaneado el', 'Als bezahlt eingetragen.': 'Registrado como pagado.', 'Bitte eine Nummer eingeben.': 'Introduzca un número.',
   'Mitglieder': 'Socios', 'lfd. Nr.': 'N.º', 'Beiträge': 'Cuotas', 'Abgleich': 'Sincronizar', 'Suchen': 'Buscar', 'Jahr': 'Año', 'Alle aktiven': 'Todos los activos', 'Noch nicht bezahlt': 'Sin pagar', 'Bezahlt': 'Pagado', 'Ausgetretene mit': 'Incluir bajas',
   'Neues Mitglied': 'Nuevo socio', 'Vorname (Nombre)': 'Nombre', 'Apellido 1 (Nachname 1)': 'Primer apellido', 'Apellido 2 (Nachname 2)': 'Segundo apellido', 'Apodo (Beiname)': 'Apodo', 'Notiz': 'Nota', 'Geburtstag': 'Cumpleaños', 'Mobiltelefon': 'Móvil', 'E-Mail': 'Correo electrónico', 'Adresse': 'Dirección',
@@ -94,28 +94,36 @@ const dmy = d => d ? d.slice(8, 10) + '.' + d.slice(5, 7) + '.' + d.slice(0, 4) 
 function stopCam() { if (CAM) { CAM.run = false; try { CAM.stream.getTracks().forEach(x => x.stop()); } catch (e) { } CAM = null; } }
 function vQ() {
   $('#m').innerHTML = `<div class="sum">${t('Halte die Kamera auf den kleinen Code unten links auf dem Beleg.')}</div>
-   <video id="vid" playsinline muted style="width:100%;border-radius:12px;background:#000;max-height:55vh"></video><canvas id="cv" style="display:none"></canvas><div id="qres"></div>
+   <video id="vid" playsinline muted style="width:100%;border-radius:12px;background:#000;max-height:55vh"></video><canvas id="cv" style="display:none"></canvas><div style="display:none;margin-top:8px"><label>Zoom</label><input type="range" id="zm"></div><div class="mu" style="margin-top:6px">${t('Der Code ist klein: Kamera ca. 10–15 cm vor den Code halten, ruhig und gut beleuchtet.')}</div><div id="qres"></div>
    <label>${t('Oder Belegnummer eintippen')}</label><div class="half"><select id="qy">${yrOpts()}</select><input id="qn" inputmode="numeric" placeholder="123"><button class="btn" onclick="qManual()">${t('Suchen')}</button></div>`;
   startCam();
 }
 async function startCam() {
   stopCam();
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
     const v = $('#vid'); if (!v || S.tab !== 'q') { stream.getTracks().forEach(x => x.stop()); return; }
-    v.srcObject = stream; await v.play(); CAM = { stream, run: true }; scanLoop();
-  } catch (e) { msg(t('Die Kamera ist nicht verfügbar. Bitte die Nummer eintippen.'), 1); }
+    const tr = stream.getVideoTracks()[0]; let caps = {}; try { caps = tr.getCapabilities ? tr.getCapabilities() : {}; } catch (e) { }
+    try { if (caps.focusMode && caps.focusMode.includes('continuous')) await tr.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) { }
+    v.srcObject = stream; await v.play();
+    let bd = null; try { if ('BarcodeDetector' in window) bd = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { }
+    CAM = { stream, run: true, bd }; const z = $('#zm');
+    if (z && caps.zoom) { z.min = caps.zoom.min; z.max = caps.zoom.max; z.step = caps.zoom.step || 0.1; z.value = caps.zoom.min; z.parentElement.style.display = 'block'; z.oninput = () => tr.applyConstraints({ advanced: [{ zoom: +z.value }] }).catch(() => { }); }
+    scanLoop();
+  } catch (e) { msg(t('Die Kamera ist nicht verfügbar. Bitte die Nummer eintippen.') + ' (' + (e && e.name || '') + ')', 1); }
 }
-function scanLoop() {
+async function scanLoop() {
   const c = CAM; if (!c || !c.run) return;
-  const v = $('#vid'), cv = $('#cv');
-  if (v && v.videoWidth) {
-    cv.width = v.videoWidth; cv.height = v.videoHeight; const g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(v, 0, 0);
-    const id = g.getImageData(0, 0, cv.width, cv.height), r = jsQR(id.data, id.width, id.height, { inversionAttempts: 'dontInvert' });
-    const m = r && /^CD(\d{4})-(\d{1,6})$/.exec(String(r.data).trim());
-    if (m) { stopCam(); v.pause(); qFound(+m[1], +m[2]); return; }
-  }
-  setTimeout(() => requestAnimationFrame(scanLoop), 120);
+  const v = $('#vid'), cv = $('#cv'); let txt = '';
+  try {
+    if (v && v.videoWidth) {
+      if (c.bd) { try { const r = await c.bd.detect(v); if (r.length) txt = r[0].rawValue || ''; } catch (e) { c.bd = null; } }
+      if (!txt) { cv.width = v.videoWidth; cv.height = v.videoHeight; const g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(v, 0, 0); const id = g.getImageData(0, 0, cv.width, cv.height), r = jsQR(id.data, id.width, id.height, { inversionAttempts: 'attemptBoth' }); if (r && r.data) txt = r.data; }
+    }
+  } catch (e) { }
+  const m = /^CD(\d{4})-(\d{1,6})$/.exec(String(txt).trim());
+  if (m && CAM === c) { stopCam(); if (v) v.pause(); qFound(+m[1], +m[2]); return; }
+  if (CAM === c) setTimeout(scanLoop, 150);
 }
 function qManual() { const n = parseInt($('#qn').value, 10); if (!(n > 0)) return msg(t('Bitte eine Nummer eingeben.'), 1); stopCam(); qFound(+$('#qy').value, n); }
 function qFound(y, n) {
