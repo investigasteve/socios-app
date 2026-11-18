@@ -1,6 +1,8 @@
 /* Cofradía – Mitglieder (Handy-App). Daten bleiben im Handy; Abgleich mit dem Notebook über eine JSON-Datei (Google Drive). */
 'use strict';
 const ES = {
+  'Scannen': 'Escanear', 'Halte die Kamera auf den kleinen Code unten links auf dem Beleg.': 'Apunte la cámara al pequeño código abajo a la izquierda del recibo.', 'Oder Belegnummer eintippen': 'O escriba el número del recibo', 'Die Kamera ist nicht verfügbar. Bitte die Nummer eintippen.': 'La cámara no está disponible. Escriba el número.',
+  'Dieser Beleg ist im Handy nicht bekannt. Bitte im Reiter „Abgleich“ zuerst den neuesten Stand laden.': 'Este recibo no está en el móvil. Cargue primero los datos más recientes en «Sincronizar».', 'Beleg Nr.': 'Recibo n.º', 'Bereits bezahlt am': 'Ya pagado el', 'Als bezahlt eintragen': 'Registrar como pagado', 'Weiter scannen': 'Seguir escaneando', 'Gescannt am': 'Escaneado el', 'Als bezahlt eingetragen.': 'Registrado como pagado.', 'Bitte eine Nummer eingeben.': 'Introduzca un número.',
   'Mitglieder': 'Socios', 'lfd. Nr.': 'N.º', 'Beiträge': 'Cuotas', 'Abgleich': 'Sincronizar', 'Suchen': 'Buscar', 'Jahr': 'Año', 'Alle aktiven': 'Todos los activos', 'Noch nicht bezahlt': 'Sin pagar', 'Bezahlt': 'Pagado', 'Ausgetretene mit': 'Incluir bajas',
   'Neues Mitglied': 'Nuevo socio', 'Vorname (Nombre)': 'Nombre', 'Apellido 1 (Nachname 1)': 'Primer apellido', 'Apellido 2 (Nachname 2)': 'Segundo apellido', 'Apodo (Beiname)': 'Apodo', 'Notiz': 'Nota', 'Geburtstag': 'Cumpleaños', 'Mobiltelefon': 'Móvil', 'E-Mail': 'Correo electrónico', 'Adresse': 'Dirección',
   'Eintrittsjahr': 'Año de ingreso', 'Aktives Mitglied': 'Socio activo', 'Speichern': 'Guardar', 'Abbrechen': 'Cancelar', 'Gespeichert.': 'Guardado.', 'Vorname und erster Nachname fehlen.': 'Faltan el nombre y el primer apellido.',
@@ -85,15 +87,59 @@ async function sichern() {
   } catch (e) { if (e && e.name !== 'AbortError') msg(String(e.message || e), 1); }
 }
 
+
+/* ---------- Beleg scannen (QR-Code auf der Quittung: CD<Jahr>-<laufende Nr.>) ---------- */
+let CAM = null;
+const dmy = d => d ? d.slice(8, 10) + '.' + d.slice(5, 7) + '.' + d.slice(0, 4) : '';
+function stopCam() { if (CAM) { CAM.run = false; try { CAM.stream.getTracks().forEach(x => x.stop()); } catch (e) { } CAM = null; } }
+function vQ() {
+  $('#m').innerHTML = `<div class="sum">${t('Halte die Kamera auf den kleinen Code unten links auf dem Beleg.')}</div>
+   <video id="vid" playsinline muted style="width:100%;border-radius:12px;background:#000;max-height:55vh"></video><canvas id="cv" style="display:none"></canvas><div id="qres"></div>
+   <label>${t('Oder Belegnummer eintippen')}</label><div class="half"><select id="qy">${yrOpts()}</select><input id="qn" inputmode="numeric" placeholder="123"><button class="btn" onclick="qManual()">${t('Suchen')}</button></div>`;
+  startCam();
+}
+async function startCam() {
+  stopCam();
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    const v = $('#vid'); if (!v || S.tab !== 'q') { stream.getTracks().forEach(x => x.stop()); return; }
+    v.srcObject = stream; await v.play(); CAM = { stream, run: true }; scanLoop();
+  } catch (e) { msg(t('Die Kamera ist nicht verfügbar. Bitte die Nummer eintippen.'), 1); }
+}
+function scanLoop() {
+  const c = CAM; if (!c || !c.run) return;
+  const v = $('#vid'), cv = $('#cv');
+  if (v && v.videoWidth) {
+    cv.width = v.videoWidth; cv.height = v.videoHeight; const g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(v, 0, 0);
+    const id = g.getImageData(0, 0, cv.width, cv.height), r = jsQR(id.data, id.width, id.height, { inversionAttempts: 'dontInvert' });
+    const m = r && /^CD(\d{4})-(\d{1,6})$/.exec(String(r.data).trim());
+    if (m) { stopCam(); v.pause(); qFound(+m[1], +m[2]); return; }
+  }
+  setTimeout(() => requestAnimationFrame(scanLoop), 120);
+}
+function qManual() { const n = parseInt($('#qn').value, 10); if (!(n > 0)) return msg(t('Bitte eine Nummer eingeben.'), 1); stopCam(); qFound(+$('#qy').value, n); }
+function qFound(y, n) {
+  const b = D.beitraege.find(x => x.jahr === y && x.quittung_nr === n), m = b && mByUid(b.uid);
+  if (!m) { $('#qres').innerHTML = `<div class="sum">${t('Dieser Beleg ist im Handy nicht bekannt. Bitte im Reiter „Abgleich“ zuerst den neuesten Stand laden.')} (${y}-${n})</div><div class="row"><button class="btn" onclick="go('q')">${t('Weiter scannen')}</button></div>`; return; }
+  $('#qres').innerHTML = `<div class="card"><b>${esc(nm(m))}</b>${m.apodo ? ` <span class="tag">${esc(m.apodo)}</span>` : ''}<div class="mu">${esc(m.nummer)} · ${t('Beleg Nr.')} ${n} · ${y}</div><div style="font-size:20px;margin-top:6px"><b>${eur(b.betrag)}</b></div>
+    <div class="mu" style="margin-top:6px">${b.bezahlt ? '✓ ' + t('Bereits bezahlt am') + ' ' + dmy(b.bezahlt) : ''}</div></div>
+    <div class="row">${b.bezahlt ? '' : `<button class="btn" onclick="qPay('${m.uid}',${y},${n})">${t('Als bezahlt eintragen')}</button>`}<button class="btn alt" onclick="go('q')">${t('Weiter scannen')}</button></div>`;
+}
+function qPay(u, y, n) {
+  const b = getB(u, y); if (!b || b.bezahlt) return;
+  b.bezahlt = heute(); b.geaendert = Date.now(); const note = t('Gescannt am') + ' ' + dmy(heute());
+  b.bemerkung = b.bemerkung ? b.bemerkung + ' · ' + note : note; save(); msg(t('Als bezahlt eingetragen.')); qFound(y, n);
+}
+
 /* ---------- Oberfläche ---------- */
-const TABS = [['m', 'Mitglieder'], ['b', 'Beiträge'], ['y', 'Abgleich']];
+const TABS = [['m', 'Mitglieder'], ['b', 'Beiträge'], ['q', 'Scannen'], ['y', 'Abgleich']];
 function chrome() {
   $('#nv').innerHTML = TABS.map(([k, n]) => `<button class="${S.tab === k ? 'on' : ''}" onclick="go('${k}')">${t(n)}</button>`).join('');
   $('#lg').innerHTML = `<button class="${LANG === 'de' ? 'on' : ''}" onclick="sprache('de')">DE</button> <button class="${LANG === 'es' ? 'on' : ''}" onclick="sprache('es')">ES</button>`;
   $('#hs').textContent = D.mitglieder.length + ' ' + t('Mitglieder insgesamt');
 }
 function sprache(l) { LANG = l; try { localStorage.setItem('cd_lang', l); } catch (e) { } document.documentElement.lang = l; go(S.tab); }
-function go(tab) { S.tab = tab; chrome(); ({ m: vM, b: vB, y: vY })[tab](); scrollTo(0, 0); }
+function go(tab) { stopCam(); S.tab = tab; chrome(); ({ m: vM, b: vB, q: vQ, y: vY })[tab](); scrollTo(0, 0); }
 const yrOpts = () => { let h = ''; for (let y = 2022; y <= 2032; y++) h += `<option ${y === S.jahr ? 'selected' : ''}>${y}</option>`; return h; };
 const ordSel = () => `<select onchange="S.ord=this.value;try{localStorage.setItem('cd_ord',S.ord)}catch(e){}go(S.tab)"><option value="n" ${S.ord === 'n' ? 'selected' : ''}>${t('Nachname 1, Nachname 2, Vorname')}</option><option value="v" ${S.ord === 'v' ? 'selected' : ''}>${t('Vorname, Nachname 1, Nachname 2')}</option></select>`;
 const keepQ = () => `<input type="search" id="q" placeholder="${t('Suchen')}" value="${esc(S.q)}" oninput="S.q=this.value;list()">`;
