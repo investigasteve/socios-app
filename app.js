@@ -89,10 +89,10 @@ async function sichern() {
 const TABS = [['m', 'Mitglieder'], ['b', 'Beiträge'], ['y', 'Abgleich']];
 function chrome() {
   $('#nv').innerHTML = TABS.map(([k, n]) => `<button class="${S.tab === k ? 'on' : ''}" onclick="go('${k}')">${t(n)}</button>`).join('');
-  $('#lg').innerHTML = `<button class="${LANG === 'de' ? 'on' : ''}" onclick="lang('de')">DE</button> <button class="${LANG === 'es' ? 'on' : ''}" onclick="lang('es')">ES</button>`;
+  $('#lg').innerHTML = `<button class="${LANG === 'de' ? 'on' : ''}" onclick="sprache('de')">DE</button> <button class="${LANG === 'es' ? 'on' : ''}" onclick="sprache('es')">ES</button>`;
   $('#hs').textContent = D.mitglieder.length + ' ' + t('Mitglieder insgesamt');
 }
-function lang(l) { LANG = l; try { localStorage.setItem('cd_lang', l); } catch (e) { } document.documentElement.lang = l; go(S.tab); }
+function sprache(l) { LANG = l; try { localStorage.setItem('cd_lang', l); } catch (e) { } document.documentElement.lang = l; go(S.tab); }
 function go(tab) { S.tab = tab; chrome(); ({ m: vM, b: vB, y: vY })[tab](); scrollTo(0, 0); }
 const yrOpts = () => { let h = ''; for (let y = 2022; y <= 2032; y++) h += `<option ${y === S.jahr ? 'selected' : ''}>${y}</option>`; return h; };
 const ordSel = () => `<select onchange="S.ord=this.value;try{localStorage.setItem('cd_ord',S.ord)}catch(e){}go(S.tab)"><option value="n" ${S.ord === 'n' ? 'selected' : ''}>${t('Nachname 1, Nachname 2, Vorname')}</option><option value="v" ${S.ord === 'v' ? 'selected' : ''}>${t('Vorname, Nachname 1, Nachname 2')}</option></select>`;
