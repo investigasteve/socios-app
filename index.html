@@ -28,5 +28,5 @@ textarea{min-height:76px}label{display:block;font-size:13px;color:var(--mu);marg
 <main id="m"></main><nav id="nv"></nav><div id="ov"></div><div id="toast"></div>
 <script src="vendor/jsQR.js"></script>
 <script src="app.js"></script>
-<script>if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
+<script>if('serviceWorker' in navigator)addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});var had=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload();had=true;});});</script>
 </body></html>

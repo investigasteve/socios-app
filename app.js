@@ -1,7 +1,7 @@
 /* Cofradía – Mitglieder (Handy-App). Daten bleiben im Handy; Abgleich mit dem Notebook über eine JSON-Datei (Google Drive). */
 'use strict';
 const ES = {
-  'Scannen': 'Escanear', 'Der Code ist klein: Kamera ca. 10–15 cm vor den Code halten, ruhig und gut beleuchtet.': 'El código es pequeño: sostenga la cámara a unos 10–15 cm del código, quieta y con buena luz.', 'Halte die Kamera auf den kleinen Code unten links auf dem Beleg.': 'Apunte la cámara al pequeño código abajo a la izquierda del recibo.', 'Oder Belegnummer eintippen': 'O escriba el número del recibo', 'Die Kamera ist nicht verfügbar. Bitte die Nummer eintippen.': 'La cámara no está disponible. Escriba el número.',
+  'Scannen': 'Escanear', 'Beleg fotografieren': 'Fotografiar recibo', 'Kamera läuft – suche Code …': 'Cámara activa – buscando código …', 'Anderer Code gelesen:': 'Otro código leído:', 'Foto wird gelesen …': 'Leyendo foto …', 'Kein Code erkannt. Bitte näher heran, ruhig halten oder die Nummer eintippen.': 'Código no detectado. Acerque la cámara, manténgala quieta o escriba el número.', 'Der Code ist klein: Kamera ca. 10–15 cm vor den Code halten, ruhig und gut beleuchtet.': 'El código es pequeño: sostenga la cámara a unos 10–15 cm del código, quieta y con buena luz.', 'Halte die Kamera auf den kleinen Code unten links auf dem Beleg.': 'Apunte la cámara al pequeño código abajo a la izquierda del recibo.', 'Oder Belegnummer eintippen': 'O escriba el número del recibo', 'Die Kamera ist nicht verfügbar. Bitte die Nummer eintippen.': 'La cámara no está disponible. Escriba el número.',
   'Dieser Beleg ist im Handy nicht bekannt. Bitte im Reiter „Abgleich“ zuerst den neuesten Stand laden.': 'Este recibo no está en el móvil. Cargue primero los datos más recientes en «Sincronizar».', 'Beleg Nr.': 'Recibo n.º', 'Bereits bezahlt am': 'Ya pagado el', 'Als bezahlt eintragen': 'Registrar como pagado', 'Weiter scannen': 'Seguir escaneando', 'Gescannt am': 'Escaneado el', 'Als bezahlt eingetragen.': 'Registrado como pagado.', 'Bitte eine Nummer eingeben.': 'Introduzca un número.',
   'Mitglieder': 'Socios', 'lfd. Nr.': 'N.º', 'Beiträge': 'Cuotas', 'Abgleich': 'Sincronizar', 'Suchen': 'Buscar', 'Jahr': 'Año', 'Alle aktiven': 'Todos los activos', 'Noch nicht bezahlt': 'Sin pagar', 'Bezahlt': 'Pagado', 'Ausgetretene mit': 'Incluir bajas',
   'Neues Mitglied': 'Nuevo socio', 'Vorname (Nombre)': 'Nombre', 'Apellido 1 (Nachname 1)': 'Primer apellido', 'Apellido 2 (Nachname 2)': 'Segundo apellido', 'Apodo (Beiname)': 'Apodo', 'Notiz': 'Nota', 'Geburtstag': 'Cumpleaños', 'Mobiltelefon': 'Móvil', 'E-Mail': 'Correo electrónico', 'Adresse': 'Dirección',
@@ -94,7 +94,7 @@ const dmy = d => d ? d.slice(8, 10) + '.' + d.slice(5, 7) + '.' + d.slice(0, 4) 
 function stopCam() { if (CAM) { CAM.run = false; try { CAM.stream.getTracks().forEach(x => x.stop()); } catch (e) { } CAM = null; } }
 function vQ() {
   $('#m').innerHTML = `<div class="sum">${t('Halte die Kamera auf den kleinen Code unten links auf dem Beleg.')}</div>
-   <video id="vid" playsinline muted style="width:100%;border-radius:12px;background:#000;max-height:55vh"></video><canvas id="cv" style="display:none"></canvas><div style="display:none;margin-top:8px"><label>Zoom</label><input type="range" id="zm"></div><div class="mu" style="margin-top:6px">${t('Der Code ist klein: Kamera ca. 10–15 cm vor den Code halten, ruhig und gut beleuchtet.')}</div><div id="qres"></div>
+   <video id="vid" playsinline muted style="width:100%;border-radius:12px;background:#000;max-height:55vh"></video><canvas id="cv" style="display:none"></canvas><div style="display:none;margin-top:8px"><label>Zoom</label><input type="range" id="zm"></div><div class="mu" style="margin-top:6px">${t('Der Code ist klein: Kamera ca. 10–15 cm vor den Code halten, ruhig und gut beleuchtet.')}</div><div class="mu" id="qst" style="margin-top:6px"></div><div class="row"><label class="btn alt" style="margin:0">📷 ${t('Beleg fotografieren')}<input type="file" accept="image/*" capture="environment" style="display:none" onchange="qFoto(this)"></label></div><div id="qres"></div>
    <label>${t('Oder Belegnummer eintippen')}</label><div class="half"><select id="qy">${yrOpts()}</select><input id="qn" inputmode="numeric" placeholder="123"><button class="btn" onclick="qManual()">${t('Suchen')}</button></div>`;
   startCam();
 }
@@ -105,7 +105,7 @@ async function startCam() {
     const v = $('#vid'); if (!v || S.tab !== 'q') { stream.getTracks().forEach(x => x.stop()); return; }
     const tr = stream.getVideoTracks()[0]; let caps = {}; try { caps = tr.getCapabilities ? tr.getCapabilities() : {}; } catch (e) { }
     try { if (caps.focusMode && caps.focusMode.includes('continuous')) await tr.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }); } catch (e) { }
-    v.srcObject = stream; await v.play();
+    v.srcObject = stream; await v.play(); const qs = $('#qst'); if (qs) qs.textContent = t('Kamera läuft – suche Code …') + ' (' + v.videoWidth + '×' + v.videoHeight + ')';
     let bd = null; try { if ('BarcodeDetector' in window) bd = new BarcodeDetector({ formats: ['qr_code'] }); } catch (e) { }
     CAM = { stream, run: true, bd }; const z = $('#zm');
     if (z && caps.zoom) { z.min = caps.zoom.min; z.max = caps.zoom.max; z.step = caps.zoom.step || 0.1; z.value = caps.zoom.min; z.parentElement.style.display = 'block'; z.oninput = () => tr.applyConstraints({ advanced: [{ zoom: +z.value }] }).catch(() => { }); }
@@ -122,8 +122,27 @@ async function scanLoop() {
     }
   } catch (e) { }
   const m = /^CD(\d{4})-(\d{1,6})$/.exec(String(txt).trim());
+  if (txt && !m) { const qs = $('#qst'); if (qs) qs.textContent = t('Anderer Code gelesen:') + ' ' + String(txt).slice(0, 60); }
   if (m && CAM === c) { stopCam(); if (v) v.pause(); qFound(+m[1], +m[2]); return; }
   if (CAM === c) setTimeout(scanLoop, 150);
+}
+async function qFoto(inp) {
+  const f = inp.files[0]; inp.value = ''; if (!f) return; stopCam();
+  const qs = $('#qst'); if (qs) qs.textContent = t('Foto wird gelesen …');
+  let txt = '';
+  try {
+    const bmp = await createImageBitmap(f); const W = bmp.width, H = bmp.height;
+    if ('BarcodeDetector' in window) { try { const r = await new BarcodeDetector({ formats: ['qr_code'] }).detect(bmp); if (r.length) txt = r[0].rawValue || ''; } catch (e) { } }
+    const cv = $('#cv'), g = cv.getContext('2d', { willReadFrequently: true });
+    const tries = [[0, 0, W, H, 1600], [0, H * 0.3, W * 0.6, H * 0.7, 1600], [0, 0, W, H, 2400], [0, 0, W, H, 1000], [0, H * 0.4, W * 0.5, H * 0.6, 1200]];
+    for (const [x, y, w, h, mx] of tries) {
+      if (txt) break; const k = mx / Math.max(w, h); cv.width = Math.round(w * k); cv.height = Math.round(h * k); g.drawImage(bmp, x, y, w, h, 0, 0, cv.width, cv.height);
+      const id = g.getImageData(0, 0, cv.width, cv.height), r = jsQR(id.data, id.width, id.height, { inversionAttempts: 'attemptBoth' }); if (r && r.data) txt = r.data;
+    }
+  } catch (e) { if (qs) qs.textContent = 'Foto: ' + (e && e.message || e); return; }
+  const m = /^CD(\d{4})-(\d{1,6})$/.exec(String(txt).trim());
+  if (m) { if (qs) qs.textContent = ''; qFound(+m[1], +m[2]); return; }
+  if (qs) qs.textContent = txt ? t('Anderer Code gelesen:') + ' ' + String(txt).slice(0, 60) : t('Kein Code erkannt. Bitte näher heran, ruhig halten oder die Nummer eintippen.');
 }
 function qManual() { const n = parseInt($('#qn').value, 10); if (!(n > 0)) return msg(t('Bitte eine Nummer eingeben.'), 1); stopCam(); qFound(+$('#qy').value, n); }
 function qFound(y, n) {
@@ -144,7 +163,7 @@ const TABS = [['m', 'Mitglieder'], ['b', 'Beiträge'], ['q', 'Scannen'], ['y', '
 function chrome() {
   $('#nv').innerHTML = TABS.map(([k, n]) => `<button class="${S.tab === k ? 'on' : ''}" onclick="go('${k}')">${t(n)}</button>`).join('');
   $('#lg').innerHTML = `<button class="${LANG === 'de' ? 'on' : ''}" onclick="sprache('de')">DE</button> <button class="${LANG === 'es' ? 'on' : ''}" onclick="sprache('es')">ES</button>`;
-  $('#hs').textContent = D.mitglieder.length + ' ' + t('Mitglieder insgesamt');
+  $('#hs').textContent = D.mitglieder.length + ' ' + t('Mitglieder insgesamt') + ' · v8';
 }
 function sprache(l) { LANG = l; try { localStorage.setItem('cd_lang', l); } catch (e) { } document.documentElement.lang = l; go(S.tab); }
 function go(tab) { stopCam(); S.tab = tab; chrome(); ({ m: vM, b: vB, q: vQ, y: vY })[tab](); scrollTo(0, 0); }
