@@ -1,7 +1,7 @@
 /* Cofradía – Mitglieder (Handy-App). Daten bleiben im Handy; Abgleich mit dem Notebook über eine JSON-Datei (Google Drive). */
 'use strict';
 const ES = {
-  'Mitglieder': 'Socios', 'Beiträge': 'Cuotas', 'Abgleich': 'Sincronizar', 'Suchen': 'Buscar', 'Jahr': 'Año', 'Alle aktiven': 'Todos los activos', 'Noch nicht bezahlt': 'Sin pagar', 'Bezahlt': 'Pagado', 'Ausgetretene mit': 'Incluir bajas',
+  'Mitglieder': 'Socios', 'lfd. Nr.': 'N.º', 'Beiträge': 'Cuotas', 'Abgleich': 'Sincronizar', 'Suchen': 'Buscar', 'Jahr': 'Año', 'Alle aktiven': 'Todos los activos', 'Noch nicht bezahlt': 'Sin pagar', 'Bezahlt': 'Pagado', 'Ausgetretene mit': 'Incluir bajas',
   'Neues Mitglied': 'Nuevo socio', 'Vorname (Nombre)': 'Nombre', 'Apellido 1 (Nachname 1)': 'Primer apellido', 'Apellido 2 (Nachname 2)': 'Segundo apellido', 'Apodo (Beiname)': 'Apodo', 'Notiz': 'Nota', 'Geburtstag': 'Cumpleaños', 'Mobiltelefon': 'Móvil', 'E-Mail': 'Correo electrónico', 'Adresse': 'Dirección',
   'Eintrittsjahr': 'Año de ingreso', 'Aktives Mitglied': 'Socio activo', 'Speichern': 'Guardar', 'Abbrechen': 'Cancelar', 'Gespeichert.': 'Guardado.', 'Vorname und erster Nachname fehlen.': 'Faltan el nombre y el primer apellido.',
   'Die Nummer vergibt das Notebook beim Abgleich.': 'El número lo asigna el portátil al sincronizar.', 'Nummer': 'Número', 'ausgetreten ab': 'baja desde', 'Zahlungen': 'Pagos', 'noch offen': 'pendiente', 'bezahlt am': 'pagado el', 'Quittung': 'Recibo', 'bezahlt durch': 'pagado por', 'hat mitbezahlt für': 'ha pagado también por', 'zahlt auch für': 'paga también por',
@@ -107,7 +107,7 @@ function vM() {
 function list() {
   const q = S.q.toLowerCase(); let rows = D.mitglieder.filter(m => m.eintritt <= S.jahr && imJahr(m, S.jahr) && (!q || (nm(m) + ' ' + m.apodo + ' ' + m.nummer).toLowerCase().includes(q)));
   const n = rows.length; sortM(rows);
-  $('#ls').innerHTML = `<div class="mu">${n} ${t('aktiv')}</div>` + (rows.length ? rows.map(m => `<div class="card" onclick="edit('${m.uid}')"><b>${esc(voll(m))}</b>${m.apodo ? ` <span class="tag">${esc(m.apodo)}</span>` : ''}<div class="mu">${esc(m.nummer || '–')}</div></div>`).join('') : `<div class="mu">${t('Keine Treffer.')}</div>`);
+  $('#ls').innerHTML = `<div class="mu">${n} ${t('aktiv')}</div>` + (rows.length ? rows.map(m => `<div class="card" onclick="edit('${m.uid}')"><b>${esc(voll(m))}</b>${m.apodo ? ` <span class="tag">${esc(m.apodo)}</span>` : ''}<div class="mu">${esc(m.nummer || '–')}${(getB(m.uid, S.jahr) || {}).quittung_nr ? ' · ' + t('lfd. Nr.') + ' ' + getB(m.uid, S.jahr).quittung_nr : ''}</div></div>`).join('') : `<div class="mu">${t('Keine Treffer.')}</div>`);
 }
 function fld(id, label, val, type) { return `<label>${t(label)}</label><input id="f_${id}" type="${type || 'text'}" value="${esc(val)}">`; }
 function edit(u) {
