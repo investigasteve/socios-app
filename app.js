@@ -24,7 +24,7 @@ const uid = () => [...crypto.getRandomValues(new Uint8Array(8))].map(b => b.toSt
 function msg(s, err) { const e = $('#toast'); e.textContent = s; e.className = err ? 'err' : ''; e.style.display = 'block'; clearTimeout(msg.t); msg.t = setTimeout(() => e.style.display = 'none', err ? 6000 : 2500); }
 
 /* ---------- Daten ---------- */
-const leer = () => ({ format: 'codinaysas', version: 1, von: 'handy', stand: 0, einstellungen: { beitrag: 15, kopf: 'Cofradia del Divino Nazareno y Santo Sepulcro', unterzeichner: 'F.Castro', jahr: 2026 }, mitglieder: [], beitraege: [], geloescht: [] });
+const leer = () => ({ format: 'codinaysas', version: 1, von: 'handy', stand: 0, einstellungen: { beitrag: 15, kopf: 'Cofradia del Divino Nazareno y Santo Sepulcro', jahr: 2026 }, mitglieder: [], beitraege: [], geloescht: [] });
 let D = (() => { try { const j = JSON.parse(localStorage.getItem('cd_data')); if (j && Array.isArray(j.mitglieder)) return j; } catch (e) { } return leer(); })();
 function save() { try { localStorage.setItem('cd_data', JSON.stringify(D)); } catch (e) { msg('Speichern im Handy nicht möglich.', 1); } }
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { }
