@@ -1,7 +1,7 @@
 /* Cofradía – Mitglieder (Handy-App). Daten bleiben im Handy; Abgleich mit dem Notebook über eine JSON-Datei (Google Drive). */
 'use strict';
 const ES = {
-  'Scannen': 'Escanear', 'Beleg fotografieren': 'Fotografiar recibo', 'Kamera läuft – suche Code …': 'Cámara activa – buscando código …', 'Anderer Code gelesen:': 'Otro código leído:', 'Foto wird gelesen …': 'Leyendo foto …', 'Kein Code erkannt. Bitte näher heran, ruhig halten oder die Nummer eintippen.': 'Código no detectado. Acerque la cámara, manténgala quieta o escriba el número.', 'Der Code ist klein: Kamera ca. 10–15 cm vor den Code halten, ruhig und gut beleuchtet.': 'El código es pequeño: sostenga la cámara a unos 10–15 cm del código, quieta y con buena luz.', 'Halte die Kamera auf den kleinen Code unten links auf dem Beleg.': 'Apunte la cámara al pequeño código abajo a la izquierda del recibo.', 'Oder Belegnummer eintippen': 'O escriba el número del recibo', 'Die Kamera ist nicht verfügbar. Bitte die Nummer eintippen.': 'La cámara no está disponible. Escriba el número.',
+  'Scannen': 'Escanear', 'Automatischer Abgleich mit Google Drive': 'Sincronización automática con Google Drive', 'Verbindungsadresse (einmalig eintragen)': 'Dirección de conexión (introducir una vez)', 'Verbinden': 'Conectar', 'Jetzt abgleichen': 'Sincronizar ahora', 'Verbunden. Letzter Abgleich:': 'Conectado. Última sincronización:', 'Noch nicht verbunden.': 'Aún sin conectar.', 'Verbindung fehlgeschlagen:': 'Conexión fallida:', 'Abgleich läuft …': 'Sincronizando …', 'Beleg fotografieren': 'Fotografiar recibo', 'Kamera läuft – suche Code …': 'Cámara activa – buscando código …', 'Anderer Code gelesen:': 'Otro código leído:', 'Foto wird gelesen …': 'Leyendo foto …', 'Kein Code erkannt. Bitte näher heran, ruhig halten oder die Nummer eintippen.': 'Código no detectado. Acerque la cámara, manténgala quieta o escriba el número.', 'Der Code ist klein: Kamera ca. 10–15 cm vor den Code halten, ruhig und gut beleuchtet.': 'El código es pequeño: sostenga la cámara a unos 10–15 cm del código, quieta y con buena luz.', 'Halte die Kamera auf den kleinen Code unten links auf dem Beleg.': 'Apunte la cámara al pequeño código abajo a la izquierda del recibo.', 'Oder Belegnummer eintippen': 'O escriba el número del recibo', 'Die Kamera ist nicht verfügbar. Bitte die Nummer eintippen.': 'La cámara no está disponible. Escriba el número.',
   'Dieser Beleg ist im Handy nicht bekannt. Bitte im Reiter „Abgleich“ zuerst den neuesten Stand laden.': 'Este recibo no está en el móvil. Cargue primero los datos más recientes en «Sincronizar».', 'Beleg Nr.': 'Recibo n.º', 'Bereits bezahlt am': 'Ya pagado el', 'Als bezahlt eintragen': 'Registrar como pagado', 'Weiter scannen': 'Seguir escaneando', 'Gescannt am': 'Escaneado el', 'Als bezahlt eingetragen.': 'Registrado como pagado.', 'Bitte eine Nummer eingeben.': 'Introduzca un número.',
   'Mitglieder': 'Socios', 'lfd. Nr.': 'N.º', 'Beiträge': 'Cuotas', 'Abgleich': 'Sincronizar', 'Suchen': 'Buscar', 'Jahr': 'Año', 'Alle aktiven': 'Todos los activos', 'Noch nicht bezahlt': 'Sin pagar', 'Bezahlt': 'Pagado', 'Ausgetretene mit': 'Incluir bajas',
   'Neues Mitglied': 'Nuevo socio', 'Vorname (Nombre)': 'Nombre', 'Apellido 1 (Nachname 1)': 'Primer apellido', 'Apellido 2 (Nachname 2)': 'Segundo apellido', 'Apodo (Beiname)': 'Apodo', 'Notiz': 'Nota', 'Geburtstag': 'Cumpleaños', 'Mobiltelefon': 'Móvil', 'E-Mail': 'Correo electrónico', 'Adresse': 'Dirección',
@@ -28,7 +28,8 @@ function msg(s, err) { const e = $('#toast'); e.textContent = s; e.className = e
 /* ---------- Daten ---------- */
 const leer = () => ({ format: 'codinaysas', version: 1, von: 'handy', stand: 0, einstellungen: { beitrag: 15, kopf: 'Cofradia del Divino Nazareno y Santo Sepulcro', jahr: 2026 }, mitglieder: [], beitraege: [], geloescht: [] });
 let D = (() => { try { const j = JSON.parse(localStorage.getItem('cd_data')); if (j && Array.isArray(j.mitglieder)) return j; } catch (e) { } return leer(); })();
-function save() { try { localStorage.setItem('cd_data', JSON.stringify(D)); } catch (e) { msg('Speichern im Handy nicht möglich.', 1); } }
+let QUIET = false;
+function save() { try { localStorage.setItem('cd_data', JSON.stringify(D)); } catch (e) { msg('Speichern im Handy nicht möglich.', 1); } if (!QUIET && typeof drvSoon === 'function') drvSoon(4000); }
 try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) { }
 const S = { tab: 'm', jahr: +D.einstellungen.jahr || 2026, q: '', filt: 'aktiv', bfilt: 'alle', ord: (() => { try { return localStorage.getItem('cd_ord') === 'v' ? 'v' : 'n'; } catch (e) { return 'n'; } })() };
 const MF = ['nummer', 'nombre', 'apellido1', 'apellido2', 'apodo', 'notiz', 'aktiv', 'eintritt', 'austritt', 'geburtstag', 'email', 'mobil', 'adresse'];
@@ -163,7 +164,7 @@ const TABS = [['m', 'Mitglieder'], ['b', 'Beiträge'], ['q', 'Scannen'], ['y', '
 function chrome() {
   $('#nv').innerHTML = TABS.map(([k, n]) => `<button class="${S.tab === k ? 'on' : ''}" onclick="go('${k}')">${t(n)}</button>`).join('');
   $('#lg').innerHTML = `<button class="${LANG === 'de' ? 'on' : ''}" onclick="sprache('de')">DE</button> <button class="${LANG === 'es' ? 'on' : ''}" onclick="sprache('es')">ES</button>`;
-  $('#hs').textContent = D.mitglieder.length + ' ' + t('Mitglieder insgesamt') + ' · v9';
+  $('#hs').textContent = D.mitglieder.length + ' ' + t('Mitglieder insgesamt') + ' · v10';
 }
 function sprache(l) { LANG = l; try { localStorage.setItem('cd_lang', l); } catch (e) { } document.documentElement.lang = l; go(S.tab); }
 function go(tab) { stopCam(); S.tab = tab; chrome(); ({ m: vM, b: vB, q: vQ, y: vY })[tab](); scrollTo(0, 0); }
@@ -248,7 +249,47 @@ function bZahler(u, inp) {
 function vY() {
   const f = ts => ts ? new Date(ts).toLocaleString(LANG === 'es' ? 'es-ES' : 'de-DE', { dateStyle: 'short', timeStyle: 'short' }) : t('nie');
   $('#m').innerHTML = `<div class="sum">${t('Stand im Handy:')} ${D.mitglieder.length} ${t('Mitglieder')} · ${t('Zuletzt gesichert:')} ${f(D.gesichert)}${D.geladen ? '' : ' · ' + t('noch nie abgeglichen')}</div>
-   <div class="row"><button class="btn" onclick="sichern()">${t('Sichern (nach Google Drive)')}</button></div><p class="mu">${t('Sichern erzeugt eine Datei. Wähle in der Liste „Drive“ aus; das Notebook liest sie beim nächsten Abgleich ein.')}</p>
+   ${drvBlock()}
+   <div class="row"><button class="btn alt" onclick="sichern()">${t('Sichern (nach Google Drive)')}</button></div><p class="mu">${t('Sichern erzeugt eine Datei. Wähle in der Liste „Drive“ aus; das Notebook liest sie beim nächsten Abgleich ein.')}</p>
    <div class="row"><label class="btn alt" style="display:inline-block;margin:0">${t('Laden (vom Google Drive)')}<input type="file" style="display:none" onchange="laden(this)"></label></div><p class="mu">${t('Laden öffnet die Dateiauswahl: nimm die Datei „cofradia-daten.json“ aus dem Drive-Ordner „Cofradia-Verwaltung“.')}</p>`;
 }
 go('m');
+
+/* ---------- Automatischer Abgleich über die Drive-Brücke (ohne Klick) ---------- */
+const DRV = { app: 'cofradia', url: (() => { try { return localStorage.getItem('cd_url') || ''; } catch (e) { return ''; } })(), busy: false, t: null, st: '' };
+const lsg = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } };
+const lss = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { } };
+const drvPost = async b => { const r = await fetch(DRV.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(b) }); const j = await r.json(); if (!j.ok) throw new Error(j.err || 'Fehler'); return j; };
+const drvGetF = async f => { const r = await fetch(DRV.url + (DRV.url.includes('?') ? '&' : '?') + 'a=get&app=' + DRV.app + '&f=' + encodeURIComponent(f) + '&_=' + Date.now()); const j = await r.json(); return j.ok ? JSON.parse(j.text) : null; };
+function drvSoon(ms) { if (!DRV.url) return; clearTimeout(DRV.t); DRV.t = setTimeout(() => drvSync(), ms || 3000); }
+function drvShow() { const e = $('#drvst'); if (e) e.textContent = DRV.st; }
+function drvBlock() {
+  return `<div class="sum"><b>${t('Automatischer Abgleich mit Google Drive')}</b><div class="mu" id="drvst">${esc(DRV.st || (DRV.url ? '' : t('Noch nicht verbunden.')))}</div>
+   <label>${t('Verbindungsadresse (einmalig eintragen)')}</label><input id="drvurl" value="${esc(DRV.url)}" placeholder="https://script.google.com/macros/s/…/exec" autocapitalize="off" autocorrect="off" spellcheck="false">
+   <div class="row"><button class="btn" onclick="drvSetze()">${DRV.url ? t('Jetzt abgleichen') : t('Verbinden')}</button></div></div>`;
+}
+async function drvSetze() {
+  const u = ($('#drvurl').value || '').trim();
+  if (u && !/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(u)) { msg('Die Adresse muss mit https://script.google.com/macros/s/ beginnen und auf /exec enden.', 1); return; }
+  DRV.url = u; try { localStorage.setItem('cd_url', u); } catch (e) { } DRV.st = t('Abgleich läuft …'); drvShow();
+  if (u) await drvSync(true);
+}
+async function drvSync(manuell) {
+  if (!DRV.url || DRV.busy || (document.hidden && !manuell)) return; DRV.busy = true; let neu = false;
+  try {
+    const m = await drvGetF('cofradia-daten.json');
+    if (m && m.format === 'codinaysas' && m.von === 'notebook' && String(m.stand) !== lsg('cd_stand', '')) { QUIET = true; const z = merge(m); QUIET = false; lss('cd_stand', String(m.stand)); neu = (z.neu + z.geaendert + z.beitraege + z.geloescht) > 0; }
+    const h = JSON.stringify([D.mitglieder, D.beitraege, D.geloescht]);
+    if (h !== lsg('cd_pushed', '')) {
+      const d = new Date(), p = n => String(n).padStart(2, '0'), name = `cofradia-handy-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.json`;
+      const out = { ...D, von: 'handy', stand: Date.now() }; delete out.geladen; delete out.gesichert;
+      await drvPost({ app: 'cofradia', name, text: JSON.stringify(out) });
+      lss('cd_pushed', h); QUIET = true; D.gesichert = Date.now(); save(); QUIET = false;
+    }
+    const z = new Date(), p = n => String(n).padStart(2, '0'); DRV.st = t('Verbunden. Letzter Abgleich:') + ' ' + p(z.getHours()) + ':' + p(z.getMinutes());
+    if (neu) { const a = document.activeElement, o = $('#ov'); if (!(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) && !(o && o.style.display === 'block') && S.tab !== 'q') go(S.tab); }
+  } catch (e) { QUIET = false; DRV.st = t('Verbindung fehlgeschlagen:') + ' ' + (e && e.message || e); }
+  DRV.busy = false; drvShow();
+}
+setTimeout(() => drvSync(), 1500); setInterval(() => drvSync(), 45000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) drvSync(); });
